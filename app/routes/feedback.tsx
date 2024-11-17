@@ -16,77 +16,55 @@ import {
 } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { z } from "zod";
-import { useRef, useState } from "react";
-import { Form, useNavigate } from "@remix-run/react";
+import { Form, redirect, useActionData} from "@remix-run/react";
 import { Input } from "~/components/ui/input";
+import fs from "fs/promises";
 
+type FeedbackErrors = {
+  subject?: string[];
+  message?: string[];
+  category?: string[];
+  severity?: string[];
+};
 
-const CategoryEnum = z.enum(['suggestions', 'bugs', 'complaints']);
-const SeverityEnum = z.enum(['low','normal','high','urgent'])
+const CategoryEnum = z.enum(["suggestions", "bugs", "complaints"]);
+const SeverityEnum = z.enum(["low", "normal", "high", "urgent"]);
 
 const feedbackSchema = z.object({
   subject: z.string().min(3).max(30),
   message: z.string().min(10).max(500),
   category: CategoryEnum.optional(),
-  severity: SeverityEnum.optional()
+  severity: SeverityEnum.optional(),
 });
 
-const feedback = () => {
-  const navigate = useNavigate();
-  const subject = useRef<HTMLInputElement | null>(null);
-  const message = useRef<HTMLTextAreaElement | null>(null);
-  const [severity, setSeverity] = useState<string | undefined>();
-  const [category, setCategory] = useState<string | undefined>();
-  
-  const [errors, setErrors] = useState({
-    subject: "",
-    message: "",
-    category:"",
-    severity: ""
-  });
+export async function action({ request }) {
+  const fromData = await request.formData();
+  const feedbackData = Object.fromEntries(fromData);
+  const result = feedbackSchema.safeParse(feedbackData);
+  if (!result.success) {
+    return { errors: result.error.flatten().fieldErrors };
+  } else {
+    const preFeedbackData = await fs.readFile("feedbacks.json", "utf-8");
+    const preData = JSON.parse(preFeedbackData);
+    preData.push(feedbackData);
+    await fs.writeFile(
+      "feedbacks.json",
+      JSON.stringify(preData, null, 2),
+      "utf-8"
+    );
+    return redirect("/");
+  }
+}
 
+const feedback = () => {
   const requireds = {
     subject: true,
     category: true,
     severity: false,
     message: true,
   };
-  const handleCategoryChange = (value: string) => {
-    setCategory(value);
-  };
-  const handleSeverityChange = (value: string) => {
-    setSeverity(value);
-  };
-
-  const handleFeedbackSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const feedbackData = {
-      subject: subject.current?.value,
-      message: message.current?.value,
-      severity,
-      category,
-    };
-    
-    const result = feedbackSchema.safeParse(feedbackData);
-    if (!result.success) {
-      const fieldErrors = result.error.format();
-      setErrors({
-        subject: fieldErrors.subject?._errors?.[0] ?? "",
-        message: fieldErrors.message?._errors?.[0] ?? "",
-        category: fieldErrors.category?._errors?.[0] ?? "",
-        severity: fieldErrors.severity?._errors?.[0] ?? "",
-      });
-    } else {
-      setErrors({
-        subject: "",
-        message: "",
-        category:"",
-        severity:""
-      });
-      navigate("/");
-      console.log(feedbackData);
-    }
-  };
+  const errors = useActionData<{ errors?: FeedbackErrors }>();
+  
   return (
     <div className="bg-slate-600 flex h-screen w-screen justify-center items-center">
       <Card className="w-fit h-auto">
@@ -97,7 +75,7 @@ const feedback = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form onSubmit={handleFeedbackSubmit} method="POST">
+          <Form method="POST">
             <div className="grid w-full items-center gap-4">
               <div className="flex flex-col space-y-1.5">
                 <div className="flex gap-1">
@@ -111,26 +89,20 @@ const feedback = () => {
                   id="subject"
                   name="subject"
                   placeholder="Enter your subject..."
-                //   required={requireds.subject}
-                  ref={subject}
+
                 />
-                {errors.subject && (
-                  <p className="text-red-600 text-xs">*{errors.subject}</p>
-                )} 
-                
+                 {errors?.errors?.subject && (
+                  <p className="text-red-600 text-xs">*{errors.errors.subject[0]}</p>
+                )}
+
                 <br />
                 <div className="flex justify-between items-center ">
                   <div className="items-center flex-col justify-center">
                     <div className="flex items-start gap-1">
                       <Label htmlFor="subject">Category</Label>
-                      <span className="text-primary -mt-2">
-                        {requireds.category ? "*" : ""}
-                      </span>
                     </div>
                     <Select
                       name="category"
-                    //   required={requireds.category}
-                      onValueChange={handleCategoryChange}
                     >
                       <SelectTrigger id="category">
                         <SelectValue placeholder="Select Category" />
@@ -141,21 +113,16 @@ const feedback = () => {
                         <SelectItem value="complaints">Complaints</SelectItem>
                       </SelectContent>
                     </Select>
-                    {errors.category && (
-                  <p className="text-red-600 text-xs">*{errors.category}</p>
+                    {errors?.errors?.category && (
+                  <p className="text-red-600 text-xs">*Required</p>
                 )}
                   </div>
                   <div className="items-center flex-col justify-center">
-                  <div className="flex items-start gap-1">
+                    <div className="flex items-start gap-1">
                       <Label htmlFor="severity">Severity</Label>
-                      <span className="text-primary -mt-2">
-                        {requireds.severity ? "*" : ""}
-                      </span>
+                      
                     </div>
-                    <Select
-                      name="severity"
-                      onValueChange={handleSeverityChange}
-                    >
+                    <Select name="severity">
                       <SelectTrigger id="severity">
                         <SelectValue placeholder="Select Severity" />
                       </SelectTrigger>
@@ -166,8 +133,8 @@ const feedback = () => {
                         <SelectItem value="urgent">Urgent</SelectItem>
                       </SelectContent>
                     </Select>
-                    {errors.severity && (
-                  <p className="text-red-600 text-xs">*{errors.severity}</p>
+                    {errors?.errors?.severity && (
+                  <p className="text-red-600 text-xs">*Required</p>
                 )}
                   </div>
                 </div>
@@ -184,11 +151,9 @@ const feedback = () => {
                   id="message"
                   placeholder="Describe the issue you're facing, along with any relevant information. Please be as detailed and specific as possible."
                   name="message"
-                //   required={requireds.message}
-                  ref={message}
-                />
-                {errors.message && (
-                  <p className="text-red-600 text-xs">*{errors.message}</p>
+                  />
+                  {errors?.errors?.message && (
+                  <p className="text-red-600 text-xs">*{errors.errors.message[0]}</p>
                 )}
                 
               </div>

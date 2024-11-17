@@ -1,0 +1,20 @@
+[
+  {
+    "subject": "This is a subject",
+    "category": "bugs",
+    "severity": "high",
+    "message": "This is a test going on!!!!!"
+  },
+  {
+    "subject": "This is subject again",
+    "category": "bugs",
+    "severity": "normal",
+    "message": "This is the final test goin on!!!!"
+  },
+  {
+    "subject": "Tested",
+    "category": "bugs",
+    "severity": "urgent",
+    "message": "The testing is Done!!!"
+  }
+]
