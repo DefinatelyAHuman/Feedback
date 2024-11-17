@@ -13,12 +13,12 @@ export const meta: MetaFunction = () => {
 
 export const loader = async () => {
   const feedbacks = await fs.readFile("feedbacks.json", "utf-8");
-  const list: Feedback[] = JSON.parse(feedbacks); 
-  return { list }; 
+  const list= await JSON.parse(feedbacks); 
+  return list ; 
 };
 
 export default function Index() {
-  const { list } = useLoaderData(); 
+  const  list  = useLoaderData(); 
   console.log(list);
   return (
     <>
